@@ -1,3 +1,7 @@
+>
+>Please note: this is a heavily modified version of https://github.com/SexualRhinoceros/MusicBot. The readme below probably isn't up to date. You'd have to read the code yourself to understand how it works. Sorry!
+>
+
 # MusicBot
 
 ## What does it do?
