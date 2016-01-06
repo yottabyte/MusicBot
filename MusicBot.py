@@ -134,7 +134,6 @@ def on_message(message):
             elif message.author.id == ownerID and firstTime is True:
                 channel = message.channel
                 vce = yield from client.join_voice_channel(message.author.voice_channel)
-                firstTime = False
                 yield from client.send_message(message.channel, '- `' + message.author.name + '` started song `' + msg + '`')
                 addSong = True
             elif msg.lower() == 'move' and message.author.id == ownerID:
@@ -148,7 +147,6 @@ def on_message(message):
                 channel = message.channel
                 if firstTime is True:
                     vce = yield from client.join_voice_channel(message.author.voice_channel)
-                    firstTime = False
                 yield from client.send_message(message.channel, '- `' + message.author.name + '` queued song `' + msg + '`')
                 addSong = True
             try:
@@ -171,6 +169,8 @@ def is_long_member(dateJoined):
     return today - margin > convDT
 
 def addSongToPlaylist(unfixedsongURL, user):
+    global firstTime
+
     if 'youtube' in unfixedsongURL:
         if '&' in unfixedsongURL:
             substrStart = unfixedsongURL.find('&')
@@ -196,6 +196,7 @@ def addSongToPlaylist(unfixedsongURL, user):
         try:
             title = info['title']
             playlist.append([songURL, title, user])
+            firstTime = False
         except KeyError:
             print('THIS WAS PROBABLY A SEARCH')
             addSongToPlaylist(info['entries'][0]['webpage_url'], user)
@@ -295,7 +296,7 @@ def playlist_update():
                 except:
                     while nextSong in playlist: playlist.remove(nextSong)
             else:
-                print("nothing in playlist so watign " + timeSinceLast)
+                print("nothing in playlist so watign " + str(timeSinceLast))
                 if timeSinceLast > 120:
                     yield from client.voice.disconnect()
                     firstTime = True
