@@ -101,14 +101,14 @@ def on_message(message):
                     yield from client.send_message(message.channel,'tits no playlist bitch')
     elif '!skip' in message.content.lower():
                 if message.author.id == ownerID:
-                    yield from client.send_message(message.channel,'- `'+message.author.name+'` used his malicious fascist powers to skip song.')
+                    yield from client.send_message(message.channel,'\u26A0 `'+message.author.name+'` used his malicious fascist powers to skip song.')
                     skipperlist = []
                     skipCount = 0
                     directive = 'skip'
                 elif message.author.id not in skipperlist:
                     skipperlist.append(message.author.id)
                     skipCount+=1
-                    yield from client.send_message(message.channel,'- `'+message.author.name+'` wants to skip song `'+str(skipCount)+'/'+str(skipsRequired)+'`')
+                    yield from client.send_message(message.channel,'\u23E9 `'+message.author.name+'` wants to skip song `'+str(skipCount)+'/'+str(skipsRequired)+'`')
                 else:
                     print('already voted to skip')
                 if skipCount >= skipsRequired:
@@ -123,7 +123,7 @@ def on_message(message):
             msg.strip()
             addSong = False
             if len(msg.lower()) < 2:
-                yield from client.send_message(message.channel, '* ' + message.author.name + ' is a fucking moron')
+                yield from client.send_message(message.channel, '\u26A0 ' + message.author.name + ' is a fucking moron')
                 return
             if message.author.id in blacklist :
                 print('no, blacklisted')
@@ -134,7 +134,7 @@ def on_message(message):
             elif message.author.id == ownerID and firstTime is True:
                 channel = message.channel
                 vce = yield from client.join_voice_channel(message.author.voice_channel)
-                yield from client.send_message(message.channel, '- `' + message.author.name + '` started song `' + msg + '`')
+                yield from client.send_message(message.channel, '\uD83C\uDFB6 `' + message.author.name + '` started `' + msg + '`')
                 addSong = True
             elif msg.lower() == 'move' and message.author.id == ownerID:
                 yield from client.voice.disconnect()
@@ -147,7 +147,7 @@ def on_message(message):
                 channel = message.channel
                 if firstTime is True:
                     vce = yield from client.join_voice_channel(message.author.voice_channel)
-                yield from client.send_message(message.channel, '- `' + message.author.name + '` queued song `' + msg + '`')
+                yield from client.send_message(message.channel, '\uD83C\uDFB6 `' + message.author.name + '` queued `' + msg + '`')
                 addSong = True
             try:
                 yield from client.delete_message(message)
@@ -155,7 +155,12 @@ def on_message(message):
                 print('Couldn\'t delete message for some reason')
             channel = message.channel
             if addSong:
-                addSongToPlaylist(msg, message.author.name)
+                error = addSongToPlaylist(msg, message.author.name)
+                print('error' + error)
+                if error == 'length':
+                    yield from client.send_message(message.channel, '\u26A0 `' + message.author.name + '` tried to queue a song longer than 15 minutes like the idiot he is.')
+                elif error == 'dunno':
+                    yield from client.send_message(message.channel, '\u26A0 `' + message.author.name + '` tried to queue a song with a broken link. Nice.')
     if sendmsg is True:
         sendmsg = False
         yield from asyncio.sleep(0.1)
@@ -194,14 +199,19 @@ def addSongToPlaylist(unfixedsongURL, user):
         info = ydl.extract_info(songURL, download=False)
         f = open('myfile','w')
         try:
-            title = info['title']
-            playlist.append([songURL, title, user])
             firstTime = False
+            title = info['title']
+            print('duration ' + str(info['duration']))
+            if info['duration'] > 60*15: 
+                return 'length'
+            playlist.append([songURL, title, user])
         except KeyError:
             print('THIS WAS PROBABLY A SEARCH')
-            addSongToPlaylist(info['entries'][0]['webpage_url'], user)
+            return addSongToPlaylist(info['entries'][0]['webpage_url'], user)
     except Exception as e:
         print("Can't access song! %s\n" % traceback.format_exc())
+        return 'dunno'
+    return 'none'
 
 def getPlaylist():
     endmsg = ''
@@ -284,10 +294,11 @@ def playlist_update():
                         player = vce.create_ffmpeg_player(path, options='''-filter:a "volume={}"'''.format(0.2))
                         player.start()
                         isPlaying = True
+                        timeSinceLast = 0
 
-                        yield from client.send_message(channel, '- Now: `' + nextSong[1] + '` requested by `' + nextSong[2] + '`')
+                        yield from client.send_message(channel, '\u25B6 Now: `' + nextSong[1] + '` requested by `' + nextSong[2] + '`')
                         if len(playlist) > 1: 
-                            yield from client.send_message(channel, '- Next: `' + playlist[1][1] + '` requested by `' + playlist[1][2] + '`')
+                            yield from client.send_message(channel, '\u23E9 Next: `' + playlist[1][1] + '` requested by `' + playlist[1][2] + '`')
 
                         while nextSong in playlist: playlist.remove(nextSong)
                         directive = 'sleep'
@@ -307,14 +318,17 @@ def playlist_update():
                     yield from asyncio.sleep(1)
                     directive = 'sleep'
         if directive == 'sleep' or directive == 'skip':
-            print('sleep/skip')
-            cnt = 0
-            while directive!='skip' and player.is_playing():
-                cnt+=1
-                yield from asyncio.sleep(1)
-            player.stop()
-            isPlaying = False
-            directive = "none"
+            try:
+                print('sleep/skip')
+                cnt = 0
+                while directive!='skip' and player.is_playing():
+                    cnt+=1
+                    yield from asyncio.sleep(1)
+                player.stop()
+                isPlaying = False
+                directive = "none"
+            except UnboundLocalError:
+                directive = "none"
         else:
             yield from asyncio.sleep(1)
 
