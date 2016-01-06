@@ -25,7 +25,6 @@ try:
 except:
     print('one of the text files was deleted, reinstall')
 
-    
 savedir = "playlist"
 if not os.path.exists(savedir):
     os.makedirs(savedir)
@@ -102,15 +101,14 @@ def on_message(message):
                     yield from client.send_message(message.channel,'tits no playlist bitch')
     elif '!skip' in message.content.lower():
                 if message.author.id == ownerID:
-                    yield from client.send_message(message.channel,'* `'+message.author.name+'` is literally hitler and used his fascist powers to skip song.')
+                    yield from client.send_message(message.channel,'- `'+message.author.name+'` used his malicious fascist powers to skip song.')
                     skipperlist = []
                     skipCount = 0
                     directive = 'skip'
                 elif message.author.id not in skipperlist:
                     skipperlist.append(message.author.id)
                     skipCount+=1
-                    print('Skip Vote by `'+message.author.name+'` to a total of `'+str(skipCount)+'/'+str(skipsRequired)+'`')
-                    yield from client.send_message(message.channel,'* `'+message.author.name+'` wants to skip song `'+str(skipCount)+'/'+str(skipsRequired)+'`')
+                    yield from client.send_message(message.channel,'- `'+message.author.name+'` wants to skip song `'+str(skipCount)+'/'+str(skipsRequired)+'`')
                 else:
                     print('already voted to skip')
                 if skipCount >= skipsRequired:
@@ -123,7 +121,7 @@ def on_message(message):
             substrStart = msg.find('!play') + 6
             msg = msg[substrStart: ]
             msg.strip()
-            print(msg.lower())
+            addSong = False
             if len(msg.lower()) < 2:
                 yield from client.send_message(message.channel, '* ' + message.author.name + ' is a fucking moron')
                 return
@@ -134,10 +132,11 @@ def on_message(message):
             elif msg.lower() == 'help':
                 hotsmessage = yield from client.send_message(message.channel,helpmessage)
             elif message.author.id == ownerID and firstTime is True:
+                channel = message.channel
                 vce = yield from client.join_voice_channel(message.author.voice_channel)
                 firstTime = False
-                playlist.append(msg)
-                yield from client.send_message(message.channel, '* `' + message.author.name + '` started song `' + msg + '`')
+                yield from client.send_message(message.channel, '- `' + message.author.name + '` started song `' + msg + '`')
+                addSong = True
             elif msg.lower() == 'move' and message.author.id == ownerID:
                 yield from client.voice.disconnect()
                 vce = yield from client.join_voice_channel(message.author.voice_channel)
@@ -146,16 +145,19 @@ def on_message(message):
                 firstTime = True
                 directive = 'none'
             else:
+                channel = message.channel
                 if firstTime is True:
                     vce = yield from client.join_voice_channel(message.author.voice_channel)
                     firstTime = False
-                playlist.append(msg)
-                yield from client.send_message(message.channel, '* `' + message.author.name + '` queued song `' + msg + '`')
+                yield from client.send_message(message.channel, '- `' + message.author.name + '` queued song `' + msg + '`')
+                addSong = True
             try:
                 yield from client.delete_message(message)
             except:
                 print('Couldn\'t delete message for some reason')
             channel = message.channel
+            if addSong:
+                addSongToPlaylist(msg, message.author.name)
     if sendmsg is True:
         sendmsg = False
         yield from asyncio.sleep(0.1)
@@ -168,37 +170,44 @@ def is_long_member(dateJoined):
     margin = datetime.timedelta(days = int(options[1]))
     return today - margin > convDT
 
+def addSongToPlaylist(unfixedsongURL, user):
+    if 'youtube' in unfixedsongURL:
+        if '&' in unfixedsongURL:
+            substrStart = unfixedsongURL.find('&')
+            songURL = unfixedsongURL[ :substrStart]
+            songURL.strip()
+        else:
+            songURL = unfixedsongURL
+    else:
+        songURL = unfixedsongURL
+    options = {
+            'format': 'bestaudio/best',
+            'extractaudio' : True,
+            'audioformat' : "mp3",
+            'outtmpl': '%(id)s',
+            'noplaylist' : True,
+            'nocheckcertificate' : True,
+        'default_search': 'auto'}
+    ydl = youtube_dl.YoutubeDL(options)
+
+    try:
+        info = ydl.extract_info(songURL, download=False)
+        f = open('myfile','w')
+        try:
+            title = info['title']
+            playlist.append([songURL, title, user])
+        except KeyError:
+            print('THIS WAS PROBABLY A SEARCH')
+            addSongToPlaylist(info['entries'][0]['webpage_url'], user)
+    except Exception as e:
+        print("Can't access song! %s\n" % traceback.format_exc())
+
 def getPlaylist():
     endmsg = ''
     count = 0
-    for things in playlist:
-        if 'youtube' in things:
-            if '&' in things:
-                substrStart = things.find('&')
-                fixedThings = things[ :substrStart]
-                fixedThings.strip()
-            else:
-                fixedThings = things
-        else:
-            fixedThings = things
-        options = {
-                'format': 'bestaudio/best',
-                'extractaudio' : True,
-                'audioformat' : "mp3",
-                'outtmpl': '%(id)s',
-                'noplaylist' : True,
-                'nocheckcertificate' : True,
-            'default_search': 'auto'}
-        ydl = youtube_dl.YoutubeDL(options)
-        try:
-            info = ydl.extract_info(fixedThings, download=False)
-            title = info['title']
-            
-        except Exception as e:
-            print("Can't access song! %s\n" % traceback.format_exc())
-            title = 'ERROR: Title is actual dicks.'
+    for songs in playlist:
         count+=1
-        endmsg =endmsg +str(count) + ": "+ title + " \n"
+        endmsg = endmsg + str(count) + '. `' + songs[1] + '` requested by `' + songs[2] + '` \n'
     return endmsg
 
 def make_savepath(title, savedir=savedir):
@@ -258,32 +267,35 @@ def playlist_update():
     global directive
     global firstTime
     global channel
-    global currentlyPlaying
     yield from client.wait_until_ready()
     count = 0
     time = 0
     while count!= -1:
-        print('ding')
+        print('ding with directive ' + directive)
         if isPlaying is False and firstTime is False:
             if playlist:
                 vce = client.voice
-                thing = playlist[0]
+                nextSong = playlist[0]
                 try:
-                    path = download_song(thing)
+                    path = download_song(nextSong[0])
+                    print('path is ' + path)
                     if path != 'invalid':
-                        print('playing ' + path)
                         player = vce.create_ffmpeg_player(path, options='''-filter:a "volume={}"'''.format(0.2))
                         player.start()
-                        yield from client.send_message(channel, '* Now playing `' + currentlyPlaying + '`')
                         isPlaying = True
-                        while thing in playlist: playlist.remove(thing)
+
+                        yield from client.send_message(channel, '- Now: `' + nextSong[1] + '` requested by `' + nextSong[2] + '`')
+                        if len(playlist) > 1: 
+                            yield from client.send_message(channel, '- Next: `' + playlist[1][1] + '` requested by `' + playlist[1][2] + '`')
+
+                        while nextSong in playlist: playlist.remove(nextSong)
                         directive = 'sleep'
                     else:
-                        while thing in playlist: playlist.remove(thing)
+                        while nextSong in playlist: playlist.remove(nextSong)
                 except:
-                    while thing in playlist: playlist.remove(thing)
+                    while nextSong in playlist: playlist.remove(nextSong)
             else:
-                print(timeSinceLast)
+                print("nothing in playlist so watign " + timeSinceLast)
                 if timeSinceLast > 120:
                     yield from client.voice.disconnect()
                     firstTime = True
