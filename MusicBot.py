@@ -184,6 +184,7 @@ def on_message(message):
                 yield from client.send_message(message.channel, '\u26A0 `' + message.author.name + '` tried to queue a song longer than 15 minutes like the idiot he is.')
             elif error == 'dunno':
                 yield from client.send_message(message.channel, '\u26A0 `' + message.author.name + '` tried to queue a song with a broken link. Nice.')
+            firstTime = False
 
     # Wait for a bit before deleting my message
     if deleteMyMsg is True:
@@ -222,21 +223,21 @@ def addSongToPlaylist(unfixedsongURL, user):
 
     try:
         info = ydl.extract_info(songURL, download=False)
-        f = open('myfile','w')
+
         try:
-            firstTime = False
             title = info['title']
             if info['duration'] > MAX_VIDEO_LENGTH: 
                 return 'length'
             playlist.append([songURL, title, user])
-            print('Adding song ' + title)
+
         except KeyError:
             print('youtube_dl gave me a list. probably a search then.')
             return addSongToPlaylist(info['entries'][0]['webpage_url'], user)
-
+    except youtube_dl.utils.DownloadError:
+        return 'dunno'
     except Exception as e:
         print("Can't access song! %s\n" % traceback.format_exc())
-        return 'dunno'
+        return 'none'
     
     return 'none'
 
